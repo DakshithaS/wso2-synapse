@@ -146,4 +146,37 @@ public interface DistributedCounterManager {
     public long getKeyLockRetrievalTimeout();
 
     public void removeLock(String key);
+
+     /**
+     * Atomically reads the window timestamp and counter for the given key.
+     *
+     * @param key distributed store key
+     * @return long[2]: {timestamp, counter}
+     */
+    public long[] getWindowState(String key);
+
+    /**
+     * Unconditionally sets a throttle window by overwriting both timestamp and counter,
+     * then setting the TTL. Must be called while holding the per-caller window lock so no
+     * concurrent writer can race. Stale data from a previous window is overwritten atomically.
+     *
+     * @param key        distributed store key
+     * @param count      initial counter value
+     * @param ts         window first-access time in milliseconds
+     * @param expiryTime absolute expiry timestamp in milliseconds (ts + unitTime)
+     */
+    public void setWindow(String key, long count, long ts, long expiryTime);
+
+    /**
+     * Atomically increments the window counter by {@code delta}, refreshes the TTL to
+     * {@code expiryTime}, and returns the new value. Refreshing the TTL guards against the
+     * narrow race where the hash key expires between the caller's pre-check and this call —
+     * without a TTL the HINCRBY-created hash would persist indefinitely.
+     *
+     * @param key        distributed store key
+     * @param delta      value to add to the counter
+     * @param expiryTime absolute window-end timestamp in ms (sharedTimestamp + unitTime)
+     * @return new global counter value after the increment
+     */
+    public long incrWindowCounter(String key, long delta, long expiryTime);
 }
